@@ -1,0 +1,60 @@
+{
+  "defs": [
+    {
+      "id": "0",
+      "step": "I open <1>",
+      "arguments": [],
+      "argTypes": ["page"],
+      "prefix": "Given"
+    },
+    {
+      "id": "1",
+      "step": "I populate <1> field with <2>",
+      "arguments": [],
+      "argTypes": ["name", "field"],
+      "prefix": "When"
+    },
+    {
+      "id": "2",
+      "step": "I click on <1>",
+      "argTypes": ["click"],
+      "arguments": [],
+      "prefix": "When"
+    },
+    {
+      "id": "3",
+      "step": "field <1> is populated with <2>",
+      "arguments": [],
+      "argTypes": ["name", "field"],
+      "prefix": "Then"
+    },
+    {
+      "id": "4",
+      "step": "I am signed in as <1>",
+      "arguments": [],
+      "argTypes": ["user"],
+      "prefix": "Given"
+    },
+    {
+      "id": "5",
+      "step": "I memorize field <1>",
+      "arguments": [],
+      "argTypes": ["field"],
+      "prefix": "When"
+    },
+    {
+      "id": "6",
+      "step": "field <1> is populated with the memorized value",
+      "arguments": [],
+      "argTypes": ["field"],
+      "prefix": "Then"
+    },
+    {
+      "id": "7",
+      "step": "I am on <1> page",
+      "arguments": [],
+      "argTypes": ["page"],
+      "prefix": "Then"
+    }
+  ]
+}

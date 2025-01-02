@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+
+<!-- Primary Meta Tags -->
+    <title>AM Diagnostic Services - AMDS</title>
+    <meta name="title" content="AMDS - AM Diagnostic Services">
+    <meta name="description" content="We provide MRI and CT staffing service including clinical setup, on all major OEM systems">
+
+<!-- Open Graph / Facebook -->
+    <meta property="og:title" content="AM Diagnostic Services - AMDS">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://amdiagnostic.co.uk/img/services.jpg">
+    <meta property="og:url" content="https://amdiagnostic.co.uk/">
+    <meta property="og:description" content="We provide MRI and CT staffing service including clinical setup, on all major OEM systems">
+
+
+<!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://amdiagnostic.co.uk/">
+    <meta property="twitter:title" content="AM Diagnostic Services - AMDS">
+    <meta property="twitter:description" content="We provide MRI and CT staffing service including clinical setup, on all major OEM systems">
+    <meta property="twitter:image" content="https://amdiagnostic.co.uk/img/services.jpg">
+
+<!-- Favicon --> 
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon/favicon-16x16.png">
+    <link rel="manifest" href="icons/favicon/site.webmanifest">
+    <link rel="mask-icon" href="icons/favicon/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+<!--Scripts-->
+<!--    <script src="https://code.jquery.com/jquery-1.11.0.min.js"></script>-->
+<!--    <script src="https://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>-->
+<!--    <script src="js/jquery.validate.min.js"></script>-->
+<!--    <script src="js/wow.min.js"></script>-->
+
+<!-- Fonts --> 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora&family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet" integrity="sha384-FJmnGRvbasRxfWGROxIxtWm56f5GY+fNtQhBvSZGVyivii4TNHcztF8bx306B08t" crossorigin="anonymous">
+
+
+<!-- Styles --> 
+    <link rel="stylesheet" href="css/style.min.css">
+    <style>
+        .modal {
+          display: none;
+          position: fixed;
+          z-index: 9999;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.5);
+          align-items: center;
+          justify-content: center;
+        }
+      
+        .modal-content {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          align-items: center;
+          justify-content: center;
+        }
+      
+        .loader {
+          border: 16px solid #f3f3f3;
+          border-top: 16px solid #3498db;
+          border-radius: 50%;
+          width: 120px;
+          height: 120px;
+          animation: spin 2s linear infinite;
+        }
+      
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body class="page">
+    <div id="el_0"></div>
+
+    <div class="overlay">
+        <div class="modal_basic" id="thanks">
+
+            <picture>
+                <source type="image/webp" srcset="icons/heart.webp">
+                <img src="icons/heart.png" alt="heart" class="icon icon_modal">
+            </picture>
+
+            <h3 class="modal__title font font__tytle font__title_modal">
+                Thank You!
+            </h3>
+            <p class="modal__descr font font__descr font__descr_contact ">
+                Your message has been sent. Thanks!
+            </p>
+            <button id="close" class="button button_small modal__btn font font__title font__title_btn-modal">ok</button>
+        </div>
+
+    </div>
+
+    <a href="#home" class="pageup">
+        <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="chevron-circle-up" class="svg-inline--fa fa-chevron-circle-up fa-w-16 pageup__svg" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path  d="M8 256C8 119 119 8 256 8s248 111 248 248-111 248-248 248S8 393 8 256zm231-113.9L103.5 277.6c-9.4 9.4-9.4 24.6 0 33.9l17 17c9.4 9.4 24.6 9.4 33.9 0L256 226.9l101.6 101.6c9.4 9.4 24.6 9.4 33.9 0l17-17c9.4-9.4 9.4-24.6 0-33.9L273 142.1c-9.4-9.4-24.6-9.4-34 0z"></path></svg>
+    </a>
+
+    <div class="cookie cookie_active" id="cookie">
+        <div class="container">
+            <div class="cookie__wrapper">
+                <span class="cookie__descr font font__descr font__descr_cookie">
+                    This website uses only essential cookies to ensure you get the best experience on our website.  <a href="cookie.html">Cookie notice</a>
+                </span>
+                <button id = "ok" class="button button_mini font font__title font__title_btn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-1.11.0.min.js"></script>
+    <script src="https://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <script src="js/jquery.validate.min.js"></script>
+    <script src="js/wow.min.js"></script>
+    <script src="js/action.js"></script>
+    <script src="js/hamburger.js"></script>
+    <script src="js/script.js"></script>
+    <div id="modal" class="modal" style="top:20%; left: 0">
+        <div class="modal-content">
+          <div class="loader"></div>
+        </div>
+    </div>
+	
+    <script async src='https://features.workingfeedback.co.uk/carousel/9270788'></script>
+
+</body>
+</html>

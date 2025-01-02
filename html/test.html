@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<head>
+ <style>
+    .test-container {
+        border: 0.5px solid rgb(29, 43, 29);
+        border-radius: 2px;
+        padding: 7px;
+        background-color: rgb(239, 240, 240);
+    }
+    .test-container:hover {
+ 
+        border: 0px solid rgb(29, 43, 29);
+        padding: 7px;
+        background-color: rgb(156, 230, 230);
+    }
+    .step-container {
+        display: flex;
+        width: 100%;
+        border: 2px solid rgb(22, 54, 22);
+        border-radius: 3px;
+        padding: 7px;
+        background-color: rgb(237, 246, 249);
+    }
+
+    .step-container:hover {
+        display: flex;
+        width: 100%;
+        border: 0px solid rgb(22, 54, 22);
+        border-radius: 3px;
+        padding: 7px;
+        background-color: rgb(156, 230, 230);
+        cursor: pointer;
+    }
+    .step-container-failed {
+        display: inline-flexbox;
+        width: 100%;
+        border: 2px solid rgb(54, 22, 27);
+        border-radius: 3px;
+        padding: 7px;
+        background-color: rgb(232, 238, 207);
+    }
+
+    .step-name {
+        color: green; 
+        font-size: large;
+        font-weight: bold;
+        margin: 10px;
+    }
+    .step-name-failed {
+        color: red; 
+        font-size: large;
+        font-weight: bold;
+        margin: 10px;
+    }
+    .step-properties {
+        color: navy; 
+        font-size: medium;
+ 
+        margin: 10px;
+    }
+ </style>
+</head>
+<body>
+    <div class="test-container" id="templateId">
+            <div class="step-container" >
+                <div class="step-name"> * </div>
+                <div class="step-name" id="name">Sample test step</div>
+                <div class="step-properties" id="start">start: 2022-12-31:23:59:00</div>
+                <div class="step-properties" id="end">end: 2022-01-01:23:59:00</div>
+                <div class="step-properties" id="duration">elapsed: 2 s</div>
+                <div class="step-name" id="status">PASSED</div>
+            </div>
+            <div id="${childredId}"></div>
+ 
+    </div>
+
+
+ 
+
+</body>
+</html>

@@ -1,0 +1,50 @@
+{
+  "step": "Feature: 1",
+  "arguments": [],
+  "children": [
+    {
+      "step": "Scenario: 1. do some testing",
+      "arguments": [],
+      "children": [
+        {
+          "step": "Given I open <1>",
+          "arguments": [
+            "https://google.com"
+          ],
+          "children": []
+        },
+        {
+          "step": "When I search for <1>",
+          "arguments": ["Death Star"],
+          "children": []
+        },
+        {
+          "step": "Then I can see some test results",
+          "arguments": [],
+          "children": []
+        }
+      ]
+    },
+    {
+      "step": "Scenario: 2. test Valtech.com",
+      "arguments": [],
+      "children": [
+        {
+          "step": "Given I open <1>",
+          "arguments": ["https://valtech.com"],
+          "children": []
+        },
+        {
+          "step": "When I hover on top menu",
+          "arguments": [],
+          "children": []
+        },
+        {
+          "step": "Then menu opens with <1> items with at least <2> sub items in each one",
+          "arguments": ["4","3"],
+          "children": []
+        }
+      ]
+    }
+  ]
+}
