@@ -54,6 +54,20 @@ public class QueryHelper {
         return HttpClient.sendHttpsPost(object,url);
     }
 
+    public static List<Integer> getLayoutIds() {
+        List<Integer> ids = new ArrayList<>();
+        var query = "select id from amds.layouts where id < 9999";
+        return JsonHelper
+                .getListFromJsonArray(getData(query, PULL_LIST)
+                        .getJSONArray(MESSAGE)).stream().map(Integer :: parseInt).collect(Collectors.toList());
+    }
+
+    public static JSONObject deleteLayout(final int id) {
+        var query = String.format("delete from amds.layouts where id=%d and id > 11 and id != 13", id);
+        return getData(query, EXECUTE);
+    }
+
+
     public static JSONObject postData(final String url, final JSONObject object, final Map<String, String> headers){
 
         return HttpClient.sendHttpsPost(object,url, headers);

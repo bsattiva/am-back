@@ -17,16 +17,14 @@ import org.json.JSONObject;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.jsoup.Jsoup;
+import org.yaml.snakeyaml.events.Event;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 
 import static com.utils.DateHelper.DATE_FORMAT;
@@ -67,6 +65,9 @@ public class AmdsHelper {
     public static final String CREATE_QUERY_TEMPLATE = "insert into amds.? (?,user_id) values(<q>)";
     public static final String ALL_SHEETS_QUERY = "select id,name from amds.sheets where id>2";
     public static final String QUESTION_MASK = "\\?";
+
+    public static final String ID = "id";
+    public static final String SEQ = "seq";
 
     public static String getSheetQuery(final String sheetId, final String userId) {
         var columns = getColumns(sheetId) + ",user_id";
@@ -185,30 +186,61 @@ public class AmdsHelper {
             return 0;
         }
     }
-    public static JSONObject setSection(final int id, final int seq, final String template) {
+
+    public static JSONObject getSection(final int id) {
+        final var query = String.format("select id,template from amds.sections where id=%d", id);
+        return QueryHelper.getData(query, QueryHelper.PULL_TABLE);
+    }
+
+    public static String enrichSection(final int id, final JSONObject data) {
+        final var temQuery = "select template from amds.templates where id=%d";
+        var qr = String.format(temQuery, id);
+        final var template = QueryHelper.getData(String.format(temQuery, id), PULL_STRING);
+        var result = "";
+        if (template.has(MESSAGE)) {
+            final var doc = Jsoup.parse(template.getString(MESSAGE));
+            for (var key : data.keySet()) {
+                var element = doc.getElementsByAttributeValue("data-label", key);
+                if (!element.isEmpty()) {
+                    element.get(0).text(data.getString(key));
+                }
+
+            }
+            result = doc.toString();
+        }
+        return result;
+    }
+    public static int setSequence(final JSONArray seq, final int secId) {
+        final var query = "update amds.sections set seq=%d where id=%d";
+        var result = -1;
+        for (var i = 0; i < seq.length(); i++) {
+            var obj = seq.getJSONObject(i);
+            var id = Integer.parseInt(obj.getString(ID));
+            var sequence = obj.getInt(SEQ);
+            var lineQuery = String.format(query, sequence, id);
+            if (id == secId) {
+                result = sequence;
+            }
+            System.out.println(lineQuery);
+        }
+        return result;
+    }
+    public static JSONObject setSection(final int id, final JSONArray seq, final String template, final JSONObject data) {
         var html = template.replace("\\", "");
         var selectQuery = String.format("select id from amds.sections where id=%d", id);
-        var sequence = (seq < 0) ? getMaxTemplate() : seq;
-        var query = String.format("insert into amds.sections values(%d,%d,'%s')", id, sequence, html);
+        var sequence = setSequence(seq, id);
+        var sec_data = data.toString();
+        var query = String.format("insert into amds.sections values(%d,%d,'%s','%s')", id, sequence, html, sec_data);
         System.out.println(query);
         var obj = QueryHelper.getData(selectQuery, PULL_TABLE);
-        if(obj.has( MESSAGE) && !obj.getJSONArray(MESSAGE).isEmpty()) {
-            query = String.format("update amds.sections set seq=%d, template='%s' where id=%d", sequence, html, id);
+        if(obj.has(MESSAGE) && !obj.getJSONArray(MESSAGE).isEmpty()) {
+            query = String
+                    .format("update amds.sections set seq=%d,template='%s',data_object='%s' where id=%d",
+                            sequence, html, data, id);
         }
         return QueryHelper.getData(query, "execute");
     }
 
-
-    public static JSONObject getTemplate(final int id) {
-        var result = Helper.getFailedObject();
-        var query = String.format("select template from amds.templates where id=%d", id);
-        var htmlObj = QueryHelper.getData(query, PULL_STRING);
-        if (htmlObj.has(MESSAGE)) {
-            var document = Jsoup.parse(htmlObj.getString(MESSAGE));
-
-        }
-        return result;
-    }
 
     public static JSONObject getLayout(final int id) {
         var result = Helper.getFailedObject();
@@ -219,6 +251,11 @@ public class AmdsHelper {
         }
         return result;
     }
+
+    public static JSONObject getSectionData(final int id) {
+        var query = String.format("select data_object from amds.sections where id=%d", id);
+        return QueryHelper.getData(query, PULL_STRING);
+    }
     public static JSONArray getSections() {
         var array = new JSONArray();
         var resp = QueryHelper.getData("select id,seq,template from amds.sections order by seq", PULL_TABLE);
@@ -227,28 +264,71 @@ public class AmdsHelper {
         }
         return array;
     }
-    public static JSONObject setTemplate(final int id, final int layout, final String template) {
-        var html = template.replace("\\", "");
+
+    public static JSONArray getTemplates() {
+        var array = new JSONArray();
+        var resp = QueryHelper.getData("select id,layout,name,template from amds.templates order by id", PULL_TABLE);
+        if (resp.has(MESSAGE)) {
+            array = resp.getJSONArray(MESSAGE);
+        }
+        return array;
+    }
+
+    public static JSONObject getTemplate(final int id) {
+        var result = Helper.getFailedObject();
+        var query = String.format("select id,layout,name,template from amds.templates where id=%d", id);
+        var htmlObj = QueryHelper.getData(query, PULL_TABLE);
+        if (htmlObj.has(MESSAGE)) {
+            result = htmlObj;
+        }
+        return result;
+    }
+
+    public static JSONArray getLayouts() {
+        var array = new JSONArray();
+        var resp = QueryHelper.getData("select id,template,name from amds.layouts order by id", PULL_TABLE);
+        if (resp.has(MESSAGE)) {
+            array = resp.getJSONArray(MESSAGE);
+        }
+        return array;
+    }
+    public static JSONObject setTemplate(final int id, final int layout, final String template, final String name) {
+        var html = template.replace("\\", "")
+                .replace("'", "\\'")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("\r", "")
+                .replace("\n", "")
+                .replace("\t", "")
+                .replace(">t<", "><")
+                .replace("&gt;t&lt;", "><");
         var selectQuery = String.format("select id from amds.templates where id=%d", id);
 
-        var query = String.format("insert into amds.templates values(%d,%d,'%s')", id, layout, html);
+        var query = String.format("insert into amds.templates values(%d,%d,'%s','%s')", id, layout, html, name);
     
         var obj = QueryHelper.getData(selectQuery, PULL_TABLE);
         if(obj.has( MESSAGE) && !obj.getJSONArray(MESSAGE).isEmpty()) {
-            query = String.format("update amds.templates set template='%s' where id=%d", html, id);
+            query = String
+                    .format("update amds.templates set template='%s',layout=%d,name='%s' where id=%d",
+                            html, layout, name, id);
         }
         return QueryHelper.getData(query, "execute");
     }
 
+    public static int getNewLayoutId() {
+        var ids = QueryHelper.getLayoutIds();
+        return Collections.max(ids);
+    }
     public static JSONObject setLayot(final int id, final String name, final String layout) {
-        var html = layout.replace("\\", "");
+        var html = layout.replace("\\", "").replace("&lt;", "<")
+                .replace("&gt;", ">");
         var selectQuery = String.format("select id from amds.layouts where id=%d", id);
 
         var query = String.format("insert into amds.layouts values(%d,'%s','%s')", id, html, name);
 
         var obj = QueryHelper.getData(selectQuery, PULL_TABLE);
         if(obj.has( MESSAGE) && !obj.getJSONArray(MESSAGE).isEmpty()) {
-            query = String.format("update amds.layouts set template='%s' where id=%d", html, id);
+            query = String.format("update amds.layouts set template='%s',name='%s' where id=%d", html, name, id);
         }
         return QueryHelper.getData(query, "execute");
     }

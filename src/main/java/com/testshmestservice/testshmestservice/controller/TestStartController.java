@@ -45,6 +45,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
+import org.testng.IResultMap;
 
 import java.net.MalformedURLException;
 import java.nio.file.Path;
@@ -64,9 +65,12 @@ public class TestStartController {
     private static final String PROJECT = "project";
     public static final String ID = "id";
     public static final String LAYOUT = "layout";
+
+    public static final String NAME = "name";
     public static final String USER_ID = "userId";
     private static final String TOKEN = "token";
     private static final String TEMPLATE = "template";
+    private static final String SECTION_DATA = "section_data";
     private static final String  SEQUENCE = "sequence";
     public static final String USER_TOKEN = "userToken";
     public static final String FILE_ID = "fileId";
@@ -165,6 +169,16 @@ public class TestStartController {
         return (!Helper.isThing(getId)) ? QueryHelper.getProject(token) : QueryHelper.getIdByToken(token);
     }
 
+    @GetMapping("/amds_get_section_data")
+    String getSectionData(final HttpServletRequest request, final HttpServletResponse response) {
+        final var auth = new Auth(request);
+        if (auth.getIsAdmin()) {
+            return AmdsHelper.getSectionData(Integer.parseInt(request.getParameter(ID))).toString();
+        } else {
+            response.setStatus(403);
+            return Helper.getFailedObject().toString();
+        }
+    }
     @GetMapping("/amds_publish_site")
     String publishSite(final HttpServletRequest request, final HttpServletResponse response) {
         var auth = new Auth(request);
@@ -859,12 +873,26 @@ public class TestStartController {
         var result = Helper.getFailedObject();
         var auth = new Auth(request);
         if(auth.getIsAdmin()) {
+
             var object = RequestHelper.getRequestBody(request);
-            result = AmdsHelper.setLayot(object.getInt(ID), object.getString("name"), object.getString(TEMPLATE));
+            var id = (object.has(ID) && object.getInt(ID) > -1) ? object.getInt(ID) : AmdsHelper.getNewLayoutId();
+            result = AmdsHelper.setLayot(id, object.getString("name"), object.getString(TEMPLATE));
         } else {
             response.setStatus(403);
         }
         return result.toString();
+    }
+
+    @PostMapping("/amds_delete_layout")
+    String deleteLayout(final HttpServletRequest request, final HttpServletResponse response) {
+        var auth = new Auth(request);
+        if (auth.getIsAdmin()) {
+            var object = RequestHelper.getRequestBody(request);
+            return QueryHelper.deleteLayout(object.getInt(ID)).toString();
+        } else {
+            response.setStatus(403);
+            return Helper.getFailedObject().toString();
+        }
     }
     @PostMapping("/amds_set_template")
     String setTemplate(final HttpServletRequest request, final HttpServletResponse response) {
@@ -872,7 +900,7 @@ public class TestStartController {
         var auth = new Auth(request);
         if(auth.getIsAdmin()) {
             var object = RequestHelper.getRequestBody(request);
-            result = AmdsHelper.setTemplate(object.getInt(ID), object.getInt(LAYOUT), object.getString(TEMPLATE));
+            result = AmdsHelper.setTemplate(object.getInt(ID), object.getInt(LAYOUT), object.getString(TEMPLATE), object.getString(NAME));
         } else {
             response.setStatus(403);
         }
@@ -885,7 +913,23 @@ public class TestStartController {
         if(auth.getIsAdmin()) {
             var object = RequestHelper.getRequestBody(request);
             result = AmdsHelper
-                    .setSection(object.getInt(ID), object.getInt(SEQUENCE), object.getString(TEMPLATE));
+                    .setSection(object.getInt(ID),
+                            object.getJSONArray(SEQUENCE),
+                            AmdsHelper.enrichSection(object.getInt(ID),
+                                    object.getJSONObject(SECTION_DATA)),
+                            object.getJSONObject(SECTION_DATA));
+        } else {
+            response.setStatus(403);
+        }
+        return result.toString();
+    }
+
+    @GetMapping("/amds_get_section")
+    String amdsGetSection(final HttpServletRequest request, final HttpServletResponse response) {
+        var result = Helper.getFailedObject();
+        var auth = new Auth(request);
+        if(auth.getIsAdmin()) {
+            result = AmdsHelper.getSection(Integer.parseInt(request.getParameter(ID)));
         } else {
             response.setStatus(403);
         }
@@ -906,6 +950,26 @@ public class TestStartController {
     @GetMapping("/amds_get_sections")
     String amdsGetSections(final HttpServletRequest request, final HttpServletResponse response) {
         return AmdsHelper.getSections().toString();
+    }
+    @GetMapping("/amds_get_templates")
+    String getTemplates(final HttpServletRequest request, final HttpServletResponse response) {
+        return AmdsHelper.getTemplates().toString();
+    }
+
+    @GetMapping("/amds_get_template")
+    String getTemplate(final HttpServletRequest request, final HttpServletResponse response) {
+        var auth = new Auth(request);
+        if (auth.getIsAdmin()) {
+            return AmdsHelper.getTemplate(Integer.parseInt(request.getParameter(ID))).toString();
+        } else {
+            response.setStatus(403);
+            return Helper.getFailedObject().toString();
+        }
+
+    }
+    @GetMapping("/amds_get_layouts")
+    String amdsGetLayouts(final HttpServletRequest request, final HttpServletResponse response) {
+        return AmdsHelper.getLayouts().toString();
     }
     @GetMapping("/amds_users")
     String getAmdsUsers(final HttpServletRequest request, final HttpServletResponse response) {
