@@ -184,6 +184,7 @@ public class TestStartController {
         var auth = new Auth(request);
         var result = Helper.getFailedObject();
         if(auth.getIsAdmin()) {
+
             var created = HtmlHelper.publishHtml();
             var obj = new JSONObject();
             obj.put("created", created);
@@ -930,6 +931,20 @@ public class TestStartController {
         var auth = new Auth(request);
         if(auth.getIsAdmin()) {
             result = AmdsHelper.getSection(Integer.parseInt(request.getParameter(ID)));
+        } else {
+            response.setStatus(403);
+        }
+        return result.toString();
+    }
+
+    @PostMapping("/amds_create_new_item")
+    String amdsSetNewItem(final HttpServletRequest request, final HttpServletResponse response) {
+        var result = Helper.getFailedObject();
+        var auth = new Auth(request);
+        if (auth.getIsAdmin()) {
+            final var obj = RequestHelper.getRequestBody(request);
+            final var newId = AmdsHelper.createNewSection(obj.getInt(ID), obj.getString(NAME));
+            result.put("id", newId);
         } else {
             response.setStatus(403);
         }

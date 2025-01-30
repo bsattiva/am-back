@@ -34,6 +34,7 @@ public class AmdsHelper {
     public static final String PULL_STRING = "pull-string";
     public static final String PULL_TABLE = "pull-table";
     public static final String MESSAGE = "message";
+    public static final String EXECUTE = "execute";
     public static final String ROW_NAME = "row_name";
     public static final String TEMPLATE = "template";
     public static final String EXTENSION = ".xlsx";
@@ -160,9 +161,6 @@ public class AmdsHelper {
 
     }
 
-    public static void main(String[] args) {
-        reassignTableToUser(2500,2300, "ct_clinical_skills");
-    }
 
     private static int getNumberOfUsers(final String table) {
         var query = "select user_id from amds.";
@@ -226,11 +224,13 @@ public class AmdsHelper {
         return result;
     }
     public static JSONObject setSection(final int id, final JSONArray seq, final String template, final JSONObject data) {
+
         var html = template.replace("\\", "");
         var selectQuery = String.format("select id from amds.sections where id=%d", id);
         var sequence = setSequence(seq, id);
+        var sectionId = (id > -1) ? id : getNewSectionId();
         var sec_data = data.toString();
-        var query = String.format("insert into amds.sections values(%d,%d,'%s','%s')", id, sequence, html, sec_data);
+        var query = String.format("insert into amds.sections values(%d,%d,'%s','%s')", sectionId, sequence, html, sec_data);
         System.out.println(query);
         var obj = QueryHelper.getData(selectQuery, PULL_TABLE);
         if(obj.has(MESSAGE) && !obj.getJSONArray(MESSAGE).isEmpty()) {
@@ -241,6 +241,21 @@ public class AmdsHelper {
         return QueryHelper.getData(query, "execute");
     }
 
+
+    public static JSONObject backUpTables() {
+        var status = new JSONArray();
+        var result = new JSONObject();
+
+         return result;
+    }
+
+    public static JSONArray backupTables() {
+        var result = new JSONArray();
+        result.put(QueryHelper.backUpSections());
+        result.put(QueryHelper.backUpLayouts());
+        result.put(QueryHelper.backUpTemplates());
+        return result;
+    }
 
     public static JSONObject getLayout(final int id) {
         var result = Helper.getFailedObject();
@@ -254,7 +269,10 @@ public class AmdsHelper {
 
     public static JSONObject getSectionData(final int id) {
         var query = String.format("select data_object from amds.sections where id=%d", id);
-        return QueryHelper.getData(query, PULL_STRING);
+        var data = QueryHelper.getData(query, PULL_STRING);
+        var result = new JSONObject();
+        result.put(MESSAGE, data.getString(MESSAGE).trim().replace("\t", ""));
+        return result;
     }
     public static JSONArray getSections() {
         var array = new JSONArray();
@@ -318,6 +336,19 @@ public class AmdsHelper {
     public static int getNewLayoutId() {
         var ids = QueryHelper.getLayoutIds();
         return Collections.max(ids);
+    }
+
+    public static int getNewSectionId() {
+        var ids = QueryHelper.getSectionsIds();
+        return Collections.max(ids);
+    }
+
+    public static int bumpFooterSequence() {
+        final var seqs = QueryHelper.getSectionsSequenceNums();
+        final var max = Collections.max(seqs);
+        final var query = String.format("update amds.sections set seq=%d where seq=%d", max + 1, max);
+        QueryHelper.getData(query, "execute");
+        return max;
     }
     public static JSONObject setLayot(final int id, final String name, final String layout) {
         var html = layout.replace("\\", "").replace("&lt;", "<")
@@ -1002,5 +1033,34 @@ public class AmdsHelper {
 
         }
 
+    }
+
+    /*
+    @method to create a new layput, template and section by copying them from the existing by id
+     */
+    public static int createNewSection(final int templateId, final String name) {
+        final var newId = getNewSectionId() + 1;
+        var layout = getLayout(templateId).getString(MESSAGE);
+        final var section = getTemplate(templateId).getJSONArray(MESSAGE).getJSONObject(0).getString(TEMPLATE);
+        final var lQuery = String.format("insert into amds.layouts values(%d,'%s','%s')", newId, layout, name);
+        final var seq = bumpFooterSequence();
+        final var sQuery = String.format("insert into amds.sections values(%d,%d,'%s','{}')", newId, seq, section);
+        final var tQuery = String.format("insert into amds.templates values(%d,%d,'%s','%s')", newId,newId,name,section);
+        QueryHelper.getData(lQuery,EXECUTE);
+        QueryHelper.getData(sQuery, EXECUTE);
+        QueryHelper.getData(tQuery, EXECUTE);
+        return newId;
+    }
+
+    public static JSONArray deleteLayoutSectionTemplate(final int id) {
+        var result = new JSONArray();
+        result.put(QueryHelper.getData(String.format("delete from amds.sections where id=%d", id), EXECUTE));
+        result.put(QueryHelper.getData(String.format("delete from amds.templates where id=%d", id), EXECUTE));
+        result.put(QueryHelper.getData(String.format("delete from amds.layouts where id=%d", id), EXECUTE));
+        return result;
+    }
+
+    public static void main(String[] args) {
+        System.out.print(deleteLayoutSectionTemplate(14).toString(5));
     }
 }

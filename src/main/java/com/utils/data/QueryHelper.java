@@ -62,9 +62,109 @@ public class QueryHelper {
                         .getJSONArray(MESSAGE)).stream().map(Integer :: parseInt).collect(Collectors.toList());
     }
 
+    public static List<Integer> getSectionsIds() {
+        List<Integer> ids = new ArrayList<>();
+        var query = "select id from amds.sections where id < 9999";
+        return JsonHelper
+                .getListFromJsonArray(getData(query, PULL_LIST)
+                        .getJSONArray(MESSAGE)).stream().map(Integer :: parseInt).collect(Collectors.toList());
+    }
+
+    public static List<Integer> getSectionsSequenceNums() {
+        List<Integer> ids = new ArrayList<>();
+        var query = "select seq from amds.sections where id < 9999";
+        return JsonHelper
+                .getListFromJsonArray(getData(query, PULL_LIST)
+                        .getJSONArray(MESSAGE)).stream().map(Integer :: parseInt).collect(Collectors.toList());
+    }
+
     public static JSONObject deleteLayout(final int id) {
         var query = String.format("delete from amds.layouts where id=%d and id > 11 and id != 13", id);
         return getData(query, EXECUTE);
+    }
+
+    public static int getRevisionNumber(final String table) {
+        final var query = String.format("select max(revision) from amds.%s", table);
+        final var res = getData(query, PULL_STRING);
+        if (res.has(MESSAGE) && Helper.isThing(res.getString(MESSAGE))) {
+            return Integer.parseInt(res.getString(MESSAGE));
+        } else {
+            return -1;
+        }
+    }
+    public static String backUpSections() {
+        final var revision = getRevisionNumber("sections") + 1;
+        final var query = "select id,seq,template,data_object from amds.sections";
+        final var entries = getData(query, PULL_TABLE).getJSONArray(MESSAGE);
+        final var insertQuery = "insert into amds.back_sections values(%d,%d,'%s','%s',%d)";
+        var stat = "";
+        for (var i = 0; i < entries.length(); i++) {
+            final var row = entries.getJSONObject(i);
+            var finalQuery = String.format(insertQuery,
+                    Integer.parseInt(row.getString("id")),
+                    Integer.parseInt(row.getString("seq")),
+                    row.getString("template"),
+                    row.getString("data_object"),
+                    revision);
+
+            final var result = getData(finalQuery, EXECUTE);
+
+            if(result.has(MESSAGE) && result.getString(MESSAGE).equals("success")) {
+                stat = "success";
+            } else {
+                stat += String.format("Error in row %d for query %s \n", Integer.parseInt(row.getString("id")), finalQuery);
+            }
+        }
+        return stat;
+    }
+
+    public static String backUpTemplates() {
+        final var revision = getRevisionNumber("templates") + 1;
+        final var query = "select id,template from amds.templates";
+        final var entries = getData(query, PULL_TABLE).getJSONArray(MESSAGE);
+        final var insertQuery = "insert into amds.back_templates(id,template,revision) values(%d,'%s',%d)";
+        var stat = "";
+        for (var i = 0; i < entries.length(); i++) {
+            final var row = entries.getJSONObject(i);
+            var finalQuery = String.format(insertQuery,
+                    Integer.parseInt(row.getString("id")),
+                    row.getString("template"),
+                    revision);
+
+            final var result = getData(finalQuery, EXECUTE);
+
+            if(result.has(MESSAGE) && result.getString(MESSAGE).equals("success")) {
+                stat = "success";
+            } else {
+                stat += String.format("Error in row %d for query %s \n", Integer.parseInt(row.getString("id")), finalQuery);
+            }
+        }
+        return stat;
+    }
+
+    public static String backUpLayouts() {
+        final var revision = getRevisionNumber("layouts") + 1;
+        final var query = "select id,template,name from amds.layouts";
+        final var entries = getData(query, PULL_TABLE).getJSONArray(MESSAGE);
+        final var insertQuery = "insert into amds.back_layouts values(%d,'%s','%s',%d)";
+        var stat = "";
+        for (var i = 0; i < entries.length(); i++) {
+            final var row = entries.getJSONObject(i);
+            var finalQuery = String.format(insertQuery,
+                    Integer.parseInt(row.getString("id")),
+                    row.getString("template"),
+                    row.getString("name"),
+                    revision);
+
+            final var result = getData(finalQuery, EXECUTE);
+
+            if(result.has(MESSAGE) && result.getString(MESSAGE).equals("success")) {
+                stat = "success";
+            } else {
+                stat += String.format("Error in row %d for query %s \n", Integer.parseInt(row.getString("id")), finalQuery);
+            }
+        }
+        return stat;
     }
 
 
