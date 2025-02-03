@@ -184,17 +184,23 @@ public class TestStartController {
         var auth = new Auth(request);
         var result = Helper.getFailedObject();
         if(auth.getIsAdmin()) {
+            final var backedUp = AmdsHelper.saveTables();
+            if(backedUp.getBoolean("status")) {
+                var created = HtmlHelper.publishHtml();
+                var obj = new JSONObject();
+                obj.put("created", created);
+                var fromFile = FileHelper.getResourcePath("index.html", false);
+                var toFile = Helper.getStringFromProperties("config.properties", "site.to");
+                var published = FileHelper.moveFile(fromFile, toFile);
+                obj.put("published", published);
+                result = new JSONObject(){{
+                    put(MESSAGE, obj);
+                }};
+            } else {
+                response.setStatus(500);
+                return backedUp.getJSONArray("statuses").toString();
+            }
 
-            var created = HtmlHelper.publishHtml();
-            var obj = new JSONObject();
-            obj.put("created", created);
-            var fromFile = FileHelper.getResourcePath("index.html", false);
-            var toFile = Helper.getStringFromProperties("config.properties", "site.to");
-            var published = FileHelper.moveFile(fromFile, toFile);
-            obj.put("published", published);
-            result = new JSONObject(){{
-                put(MESSAGE, obj);
-            }};
         } else {
             response.setStatus(403);
         }

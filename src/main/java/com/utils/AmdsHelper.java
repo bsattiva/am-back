@@ -249,13 +249,29 @@ public class AmdsHelper {
          return result;
     }
 
-    public static JSONArray backupTables() {
+    private static JSONArray backupTables() {
         var result = new JSONArray();
         result.put(QueryHelper.backUpSections());
         result.put(QueryHelper.backUpLayouts());
         result.put(QueryHelper.backUpTemplates());
         return result;
     }
+
+    public static JSONObject saveTables() {
+        final var statuses = backupTables();
+        var result = new JSONObject();
+        var stat = true;
+        for (var i = 0; i < statuses.length(); i++) {
+            if (!statuses.getString(i).equals("success")) {
+                stat = false;
+            }
+        }
+        result.put("status", stat);
+        result.put("statuses", statuses);
+        return result;
+    }
+
+
 
     public static JSONObject getLayout(final int id) {
         var result = Helper.getFailedObject();
@@ -1060,7 +1076,5 @@ public class AmdsHelper {
         return result;
     }
 
-    public static void main(String[] args) {
-        System.out.print(deleteLayoutSectionTemplate(14).toString(5));
-    }
+
 }
