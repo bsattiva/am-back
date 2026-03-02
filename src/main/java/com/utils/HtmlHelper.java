@@ -1,6 +1,7 @@
 package com.utils;
 
 import com.utils.command.JsonHelper;
+import org.apache.commons.text.StringEscapeUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
@@ -14,6 +15,30 @@ import java.util.stream.Collectors;
 
 public class HtmlHelper {
 
+    private static String decodeHtml(final String encoded) {
+        String decoded = encoded;
+        while (!decoded.equals(StringEscapeUtils.unescapeHtml4(decoded))) {
+            decoded = StringEscapeUtils.unescapeHtml4(decoded);
+        }
+        return decoded;
+    }
+
+    public static String getCleanHeader(final String head) {
+
+        var document = Jsoup.parse(head.replace("\\\"", "\"")  // Fix escaped quotes
+                .replace("<\\/", "</")  // Fix closing tags
+                .replace("\\/", "/").replace("\n", ""));
+        var columns = document.getElementsByTag("th");
+        for (var column : columns) {
+            var cleanOne = column.html().replace("__", " ").replace("_", " ");
+            var cleanTwo = cleanOne.replace("table img", "table__img");
+
+            column.html(cleanTwo);
+        }
+        return document.getElementsByTag("table").toString();
+    }
+
+
 
     public static boolean publishHtml() {
         var result = false;
@@ -24,7 +49,7 @@ public class HtmlHelper {
             var ancor = document.getElementById("el_0");
 
             for (var i = sections.length() - 1; i > -1; i--) {
-                var section = sections.getJSONObject(i).getString("template");
+                var section = decodeHtml(sections.getJSONObject(i).getString("template"));
                 var element = Jsoup.parseBodyFragment(section).body().child(0);
                 if (ancor != null) {
                     ancor.after(element);
@@ -39,9 +64,7 @@ public class HtmlHelper {
         return result;
     }
 
-    public static void main(String[] args) {
-        publishHtml();
-    }
+
     public static JSONObject parseHtml(final String htmlSource) {
         var result = new JSONObject();
         var inptypes = Arrays.stream("text,email,password,radio,checkbox,button".split(","))

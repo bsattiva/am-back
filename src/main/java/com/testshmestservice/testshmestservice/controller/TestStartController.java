@@ -3,6 +3,7 @@ package com.testshmestservice.testshmestservice.controller;
 import com.enums.Area;
 import com.utils.*;
 import com.utils.auth.Auth;
+import com.utils.auth.UserHelper;
 import com.utils.command.CommandRunner;
 import com.utils.data.QueryHelper;
 import com.utils.command.JsonHelper;
@@ -12,7 +13,7 @@ import lombok.SneakyThrows;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.log4j.Logger;
-import org.bouncycastle.cert.ocsp.Req;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -27,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import com.report.Step;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
@@ -38,20 +38,17 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
-import org.testng.IResultMap;
-
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
+
 
 @RestController
 @EnableAutoConfiguration
@@ -88,6 +85,8 @@ public class TestStartController {
     private static final String HTML = "html";
     private static final Logger LOGGER = Logger.getLogger(TestStartController.class);
     private static final String CUBE_SECRET = "cubeSecret";
+    private static final String USER_UI_FIELDS = "user_ui_fields";
+    private static final String UI_FIELDS = "ui_fields";
     private static final String SECRET = (Helper.isThing(System.getProperty(CUBE_SECRET)))
             ? System.getProperty(CUBE_SECRET) : "92jehdjasdg823jewgahuawaw wsau7a";
 
@@ -169,6 +168,10 @@ public class TestStartController {
         return (!Helper.isThing(getId)) ? QueryHelper.getProject(token) : QueryHelper.getIdByToken(token);
     }
 
+    @GetMapping("/amds_test")
+    String getTest() {
+        return "This is a test string";
+    }
     @GetMapping("/amds_get_section_data")
     String getSectionData(final HttpServletRequest request, final HttpServletResponse response) {
         final var auth = new Auth(request);
@@ -191,6 +194,7 @@ public class TestStartController {
                 obj.put("created", created);
                 var fromFile = FileHelper.getResourcePath("index.html", false);
                 var toFile = Helper.getStringFromProperties("config.properties", "site.to");
+
                 var published = FileHelper.moveFile(fromFile, toFile);
                 obj.put("published", published);
                 result = new JSONObject(){{
@@ -233,12 +237,24 @@ public class TestStartController {
 
         final var token = request.getHeader(TOKEN);
         final var id = QueryHelper.getIdByToken(token);
+        var name = QueryHelper.getNameById(id);
         final var userId = request.getParameter("userId");
 
         var result = Helper.getFailedObject();
         if (Helper.isThing(id)) {
             if (QueryHelper.isAdmin(id)) {
-                result = QueryHelper.loginAsUser(userId);
+                if (!id.equals(userId)) {
+                    result = QueryHelper.loginAsUser(userId);
+                    result.put("email", QueryHelper.getEmailById(userId));
+                } else {
+                    result = new JSONObject() {{
+                        put("id", name);
+                        put("message", "success");
+                        put("token", token);
+                        put("email", QueryHelper.getEmailById(id));
+                    }};
+                }
+
             } else {
                 response.setStatus(403);
             }
@@ -260,6 +276,9 @@ public class TestStartController {
         if (Helper.isThing(id)) {
             if (QueryHelper.isAdmin(id)) {
                 result = QueryHelper.reset(userId, password);
+                var res = QueryHelper.sendRegisterMail(QueryHelper.getEmailById(userId),
+                        QueryHelper.getNameById(userId), password);
+                System.out.println(res.toString(5));
             } else {
                 response.setStatus(403);
             }
@@ -341,23 +360,31 @@ public class TestStartController {
         var result = Helper.getFailedObject();
         if (Helper.isThing(id)) {
             if (QueryHelper.isAdmin(id)) {
-                result = new JSONObject();
-                var body = new JSONObject();
-                body.put("email", obj.getString("email"));
-                body.put("password", obj.getString("password"));
-                var preUser = QueryHelper.getLastUser();
-                result.put("create", QueryHelper.postData(Helper.getUrl("auth.url") + "/register", body));
-                TestHelper.sleep(2000);
-                var afterUser = QueryHelper.getLastUser();
-                if (Integer.parseInt(afterUser) > Integer.parseInt(preUser)) {
-                    var name = obj.getString("name");
-                    result.put("rename", QueryHelper.updateName(name, afterUser));
-                    result.put("unlock", QueryHelper.unlock(afterUser));
-                } else {
-                    result.put("user", afterUser);
-                    response.setStatus(500);
 
+                var password = Helper.getRandomString(10);
+                result = UserHelper.createUser(obj.getString("email"), password, obj.getString("name"));
+                if (result.has("error")) {
+                    response.setStatus(500);
                 }
+
+//
+//                result = new JSONObject();
+//                var body = new JSONObject();
+//                body.put("email", obj.getString("email"));
+//                body.put("password", obj.getString("password"));
+//                var preUser = QueryHelper.getLastUser();
+//                result.put("create", QueryHelper.postData(Helper.getUrl("auth.url") + "/register", body));
+//                TestHelper.sleep(2000);
+//                var afterUser = QueryHelper.getLastUser();
+//                if (Integer.parseInt(afterUser) > Integer.parseInt(preUser)) {
+//                    var name = obj.getString("name");
+//                    result.put("rename", QueryHelper.updateName(name, afterUser));
+//                    result.put("unlock", QueryHelper.unlock(afterUser));
+//                } else {
+//                    result.put("user", afterUser);
+//                    response.setStatus(500);
+//
+//                }
 
             } else {
                 response.setStatus(403);
@@ -649,9 +676,6 @@ public class TestStartController {
             Path filePath = fileDirectory.resolve(AmdsHelper.getAmdsFilesPath(AmdsHelper.getTableName(sheetId)));
             var resource = new UrlResource(filePath.toUri());
 
-            //String contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
-
-            // Set content disposition header
             String disposition = "attachment; filename=" + resource.getFilename();
 
             // Create response headers
@@ -901,6 +925,19 @@ public class TestStartController {
             return Helper.getFailedObject().toString();
         }
     }
+
+    @PostMapping("/amds_clear_section")
+    String clearSection(final HttpServletRequest request, final HttpServletResponse response) {
+        var result = new JSONObject();
+        final var auth = new Auth(request);
+        if (auth.getIsAdmin()) {
+            final var obj = RequestHelper.getRequestBody(request);
+            result.put(MESSAGE, AmdsHelper.deleteLayoutSectionTemplate(obj.getInt(ID)));
+        } else {
+            response.setStatus(403);
+        }
+        return result.toString();
+    }
     @PostMapping("/amds_set_template")
     String setTemplate(final HttpServletRequest request, final HttpServletResponse response) {
         var result = Helper.getFailedObject();
@@ -930,6 +967,19 @@ public class TestStartController {
         }
         return result.toString();
     }
+
+
+    @GetMapping("/amds_get_username")
+    String amds_get_username(final HttpServletRequest request, final HttpServletResponse response) {
+        final var auth = new Auth(request);
+        if (auth.getIsAdmin()) {
+            return QueryHelper.getEmailById(request.getParameter(ID));
+        } else {
+            response.setStatus(403);
+            return "";
+        }
+    }
+
 
     @GetMapping("/amds_get_section")
     String amdsGetSection(final HttpServletRequest request, final HttpServletResponse response) {
@@ -1047,12 +1097,17 @@ public class TestStartController {
                 var model = QueryHelper.getRowsModel(Integer.parseInt(id)).getJSONArray(MESSAGE);
                 var fields = QueryHelper.getFieldsModel(Integer.parseInt(id)).getJSONArray(MESSAGE);
                 var col = AmdsHelper.getColumns(id);
-                var userFields = fields.getJSONObject(0).getString("user_ui_fields");
+                    var userFields = (fields.getJSONObject(0).has(USER_UI_FIELDS)
+                        && Helper.isThing(fields.getJSONObject(0).getString(USER_UI_FIELDS)))
+                        ? fields.getJSONObject(0).getString("user_ui_fields")
+                        : fields.getJSONObject(0).getString("user");
                 var tableName = fields.getJSONObject(0).getString("mask_name");
                 var savedUserFields = fields.getJSONObject(0).getString("user");
-                var uiFields = fields.getJSONObject(0).getString("ui_fields");
+                var uiFields = (fields.getJSONObject(0).has(UI_FIELDS))
+                        ? fields.getJSONObject(0).getString("ui_fields")
+                        : fields.getJSONObject(0).getString("user");
                 var fieldsModel = fields.getJSONObject(0).getString("row_fields");
-                var head = fields.getJSONObject(0).getString("head");
+                var head = HtmlHelper.getCleanHeader(fields.getJSONObject(0).getString("head"));
                 var fieldModelObject = new JSONObject(fieldsModel);
 
                 result = new JSONObject();
@@ -1077,7 +1132,8 @@ public class TestStartController {
         return result.toString();
     }
 
-    @PostMapping("/amds-upload")
+
+    @PostMapping("/amds_upload")
     public String uploadFile(Model model, @RequestParam("file") MultipartFile file,
                              HttpServletRequest request, HttpServletResponse response) throws IOException {
         InputStream in = file.getInputStream();
@@ -1086,13 +1142,13 @@ public class TestStartController {
         var sheetId = request.getParameter("id");
         var usToken = (Helper.isThing(request.getParameter("userToken")))
                 ? request.getParameter("userToken").replace(" ", "+") : "";
-            System.out.println("USER TOKEN AS PARAM: " + usToken);
+        System.out.println("USER TOKEN AS PARAM: " + usToken);
         var id = QueryHelper.getIdByToken(request.getHeader("token"));
-            System.out.println("MAIN ID: " + id);
-            System.out.println("USER_TOKEN: " + request.getHeader("user_token"));
+        System.out.println("MAIN ID: " + id);
+        System.out.println("USER_TOKEN: " + request.getHeader("user_token"));
         var managedId = (Helper.isThing(usToken))
                 ? QueryHelper.getIdByToken(usToken) : "";
-            System.out.println("MANAGED_ID: " + managedId);
+        System.out.println("MANAGED_ID: " + managedId);
         var adminIntactOrIAdmin = true;
 
         var fileLocation = path.substring(0, path.length() - 1) + file.getOriginalFilename();
@@ -1104,7 +1160,7 @@ public class TestStartController {
         }
         f.flush();
         f.close();
-      //  var sheetId = QueryHelper.getSheetIdByExcelName(Objects.requireNonNull(file.getOriginalFilename()));
+
 
         model.addAttribute("message", "File: " + file.getOriginalFilename()
                 + " has been uploaded successfully!");
@@ -1133,6 +1189,121 @@ public class TestStartController {
             response.setStatus(403);
             return new JSONObject(MESSAGE, "something went wrong").toString();
         }
+    }
+    @PostMapping("/amds_upload_table")
+    public String uploadTable(Model model, @RequestParam("file") MultipartFile file,
+                             HttpServletRequest request, HttpServletResponse response) throws IOException {
+        var auth = new Auth(request);
+        var result = Helper.getFailedObject().toString();
+        if (auth.getIsAdmin()) {
+            InputStream in = file.getInputStream();
+            File currDir = new File(".");
+            String path = currDir.getAbsolutePath();
+            var tableName = request.getHeader(NAME);
+            var fileLocation = path.substring(0, path.length() - 1) + file.getOriginalFilename();
+
+            FileOutputStream f = new FileOutputStream(fileLocation);
+            int ch = 0;
+            while ((ch = in.read()) != -1) {
+                f.write(ch);
+            }
+            f.flush();
+            f.close();
+            result = FileReader.preprocessTable(fileLocation, tableName);
+        //    var tableObject = FileReader.readTable(fileLocation);
+//            var table = new SheetsTable(tableName)
+//            System.out.println(tableObject.length());
+        } else {
+            response.setStatus(403);
+        }
+
+
+      return result;
+    }
+
+    @GetMapping("/amds_get_preprocess_tables")
+    String getPreprocessTables(final HttpServletRequest request, final HttpServletResponse response) {
+        var auth = new Auth(request);
+        var result = new JSONArray();
+
+        if (auth.getIsAdmin()) {
+            final var idQuery = "select id from amds.preprocess";
+            final var ids = JsonHelper.getDistinctFromStringArray(QueryHelper.pullList(idQuery).getJSONArray(MESSAGE));
+            var query = "select id,name from amds.preprocess";
+            final var tables = QueryHelper.pullTable(query).getJSONArray(MESSAGE);
+            for (var i = 0; i < ids.length(); i++) {
+                final var id = ids.getString(i);
+                for (var j = 0; j < tables.length(); j++) {
+                    if (tables.getJSONObject(j).getString(ID).equals(id)) {
+                        result.put(tables.getJSONObject(j));
+                        break;
+                    }
+                }
+            }
+        } else {
+            response.setStatus(403);
+        }
+        return result.toString();
+    }
+
+    @GetMapping("/amds_deprocess")
+    String deprocess(final HttpServletRequest request, final HttpServletResponse response) {
+        var result = Helper.getFailedObject();
+        final var auth = new Auth(request);
+        if (auth.getIsAdmin()) {
+            result = AmdsHelper.deleteSheetTable(Integer.parseInt(request.getParameter(ID)));
+        } else {
+            response.setStatus(403);
+        }
+        return result.toString();
+    }
+    @PostMapping("/amds_set_table")
+    String setTable(final HttpServletRequest request, final HttpServletResponse response) {
+        var auth = new Auth(request);
+        var id = AmdsHelper.getNewSheetId();
+        var result = Helper.getFailedObject();
+        if (auth.getIsAdmin()) {
+            result = AmdsHelper.createNewTable(RequestHelper.getRequestBody(request), id);
+            result.put(ID, id);
+            result.put(NAME, AmdsHelper.getTableName(Integer.toString(id)));
+
+        } else {
+            response.setStatus(403);
+        }
+        return result.toString();
+    }
+
+    @GetMapping("/amds_get_preprocess_table")
+    String getPreprocessTable(final HttpServletRequest request, final HttpServletResponse response) {
+        var auth = new Auth(request);
+        var result = Helper.getFailedObject();
+        if (auth.getIsAdmin()) {
+            var id = AmdsHelper.getNewSheetId();
+            var rows = QueryHelper.pullList(String.format("select row_name from amds.preprocess where id=%d", id));
+            var rowInfo = QueryHelper.pullList(String.format("select info_row from amds.preprocess where id=%d", id));
+            var columns = QueryHelper
+                    .pullString(String.format("select column_names from amds.preprocess where id=%d", id));
+            result = new JSONObject();
+            result.put("rows", rows.getJSONArray(MESSAGE));
+            result.put("columns", columns);
+            result.put("info-rows", rowInfo.getJSONArray(MESSAGE));
+        } else {
+            response.setStatus(403);
+        }
+        return result.toString();
+    }
+
+    @GetMapping("/amds_get_postlegacy_tables")
+    String getPostLegacyTableProperties(final HttpServletRequest request, final HttpServletResponse response) {
+        final var auth = new Auth(request);
+        var result = Helper.getFailedObject();
+        if (auth.getIsUser()) {
+            var query = "select id,col_name,name from amds.button_columns";
+            return QueryHelper.pullTable(query).toString();
+        } else {
+            response.setStatus(401);
+        }
+        return result.toString();
     }
 
     @PostMapping("/amds_create_sheet")
@@ -1173,9 +1344,6 @@ public class TestStartController {
 
 
                 var inQuery = AmdsHelper.createSheetPopulateQuery(sheetId, managedId, table);
-
-
-
                 QueryHelper.getData(inQuery, "execute");
 
             } else {

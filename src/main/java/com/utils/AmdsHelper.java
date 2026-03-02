@@ -1,5 +1,6 @@
 package com.utils;
 
+import com.utils.auth.UserHelper;
 import com.utils.data.HttpClient;
 import com.utils.data.QueryHelper;
 import com.utils.command.JsonHelper;
@@ -17,14 +18,14 @@ import org.json.JSONObject;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.jsoup.Jsoup;
-import org.yaml.snakeyaml.events.Event;
-
+import org.jsoup.nodes.Element;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 import static com.utils.DateHelper.DATE_FORMAT;
@@ -110,8 +111,9 @@ public class AmdsHelper {
     public static JSONArray getTableStats(final boolean reverse) {
         var result = new JSONArray();
         var tables = getAllTables();
+        var validUsers = UserHelper.getValidUsers();
         for (var i = 0; i < tables.length(); i++) {
-            var users = getNumberOfUsers(tables.getJSONObject(i).getString("name"));
+            var users = getNumberOfUsers(tables.getJSONObject(i).getString("name"), validUsers);
             var table = new JSONObject();
             table.put("name", tables.getJSONObject(i).getString("name"));
             if (!reverse) {
@@ -162,17 +164,19 @@ public class AmdsHelper {
     }
 
 
-    private static int getNumberOfUsers(final String table) {
-        var query = "select user_id from amds.";
+    private static int getNumberOfUsers(final String table, final List<String> existingUsers) {
+        var query = "select distinct user_id from amds.";
         var rows = QueryHelper.getData(query + table, PULL_LIST).getJSONArray(MESSAGE);
+
         List<String> users = new ArrayList<>();
         for (var i = 0; i < rows.length(); i++) {
             var user = rows.getString(i);
-            if (!users.contains(user)) {
+            if (existingUsers.contains(user)) {
                 users.add(user);
             }
         }
-        return users.size();
+
+          return users.size();
     }
 
     public static int getMaxTemplate() {
@@ -201,6 +205,7 @@ public class AmdsHelper {
                 var element = doc.getElementsByAttributeValue("data-label", key);
                 if (!element.isEmpty()) {
                     element.get(0).text(data.getString(key));
+                    element.get(0).removeAttr("data-label");
                 }
 
             }
@@ -208,23 +213,94 @@ public class AmdsHelper {
         }
         return result;
     }
+
+    private static JSONArray getSequence() {
+        final var query = "select id,seq from amds.sections";
+        return QueryHelper.getData(query, PULL_TABLE).getJSONArray(MESSAGE);
+    }
+
+    private static int getSeqNumber(final int id, final JSONArray seqs) {
+        for (var i = 0; i < seqs.length(); i++) {
+            final var secId = Integer.parseInt(seqs.getJSONObject(i).getString(ID));
+            final var seq = Integer.parseInt(seqs.getJSONObject(i).getString("seq"));
+            if (secId == id) {
+                return seq;
+            }
+        }
+        return -1;
+    }
+
+
+    private static String getIdBySeq(final JSONArray array, final int seq) {
+        for (var i = 0; i < array.length(); i++) {
+            if (array.getJSONObject(i).getInt(SEQ) == seq) {
+                return array.getJSONObject(i).getString(ID);
+            }
+        }
+        return null;
+    }
+
+    private static JSONArray orderBySeq(final JSONArray array) {
+        var newArray = new JSONArray();
+        List<Integer> seqs = new ArrayList<>();
+        for (var i = 0; i < array.length(); i++) {
+            seqs.add(array.getJSONObject(i).getInt(SEQ));
+        }
+        Collections.sort(seqs);
+        for (var seq : seqs) {
+            var obj = new JSONObject();
+            obj.put(getIdBySeq(array, seq), seq);
+            newArray.put(obj);
+        }
+        return newArray;
+    }
+
     public static int setSequence(final JSONArray seq, final int secId) {
+        var res = new JSONArray();
         final var query = "update amds.sections set seq=%d where id=%d";
+        final var sentSequence = orderBySeq(seq);
+        final var seqs = getSequence();
         var result = -1;
-        for (var i = 0; i < seq.length(); i++) {
+        for (var i = 0; i < sentSequence.length(); i++) {
             var obj = seq.getJSONObject(i);
+
             var id = Integer.parseInt(obj.getString(ID));
             var sequence = obj.getInt(SEQ);
-            var lineQuery = String.format(query, sequence, id);
+
+            var currSeq = getSeqNumber(id, seqs);
+
+            if (sequence != currSeq) {
+                var lineQuery = String.format(query, sequence, id);
+                QueryHelper.getData(lineQuery, EXECUTE);
+                System.out.println(lineQuery);
+            }
             if (id == secId) {
                 result = sequence;
             }
-            System.out.println(lineQuery);
+            var reObj = new JSONObject();
+            reObj.put(Integer.toString(id), Integer.toString(sequence));
+            res.put(reObj);
         }
+        System.out.print(res.toString(4));
         return result;
     }
-    public static JSONObject setSection(final int id, final JSONArray seq, final String template, final JSONObject data) {
 
+    public static int getNewSheetId() {
+        final var query = "select max(id) from amds.sheets";
+        final var idString = QueryHelper.getData(query, PULL_STRING).getString(MESSAGE);
+        return Integer.parseInt(idString) + 1;
+    }
+
+
+
+    public static JSONObject createTable(final JSONArray columns, final JSONArray rows) {
+        var result = Helper.getFailedObject();
+
+        return result;
+    }
+
+    public static JSONObject setSection(final int id, final JSONArray seq, final String template, final JSONObject data) {
+        var sc = getSequence();
         var html = template.replace("\\", "");
         var selectQuery = String.format("select id from amds.sections where id=%d", id);
         var sequence = setSequence(seq, id);
@@ -290,9 +366,11 @@ public class AmdsHelper {
         result.put(MESSAGE, data.getString(MESSAGE).trim().replace("\t", ""));
         return result;
     }
+    
     public static JSONArray getSections() {
         var array = new JSONArray();
-        var resp = QueryHelper.getData("select id,seq,template from amds.sections order by seq", PULL_TABLE);
+        var resp = QueryHelper.getData("select id,seq,template,name from amds.sections order by seq", PULL_TABLE);
+
         if (resp.has(MESSAGE)) {
             array = resp.getJSONArray(MESSAGE);
         }
@@ -490,6 +568,8 @@ public class AmdsHelper {
                 + userId
                 + EXTENSION;
     }
+
+
 
     public static List<String[]> getUsers() {
         List<String[]> result = new ArrayList<>();
@@ -945,25 +1025,25 @@ public class AmdsHelper {
         var sheetName = getTableName(sheetId);
         var columns = getColumns(sheetId);
         var cols = List.of(columns.split(","));
-        var name = userId;
 
         var query = "insert into amds." + sheetName + "(" + columns + ",user_id) values ";
         for (var i = 0; i < data.length(); i++) {
-            var row = "(";
+            StringBuilder row = new StringBuilder("(");
             var j = 0;
 
             for (var column : cols) {
                 var rw = data.getJSONObject(i);
-                var tp = rw.get(column) instanceof String;
-                var value =  data.getJSONObject(i).getString(column).replace('\uF06E', '\0')
-                        .replace("'", "''");
-                row = row + "'" + value + "',";
+
+                var value =  (data.getJSONObject(i).has(column))
+                        ? data.getJSONObject(i).getString(column).replace('\uF06E', '\0')
+                        .replace("'", "''") : "";
+                row.append("'").append(value).append("',");
 
                 j++;
             }
-            row = row + "'" + name + "')";
+            row.append("'").append(userId).append("')");
             if (i < data.length() - 1) {
-                row = row + ",";
+                row.append(",");
 
             }
             query = query + row;
@@ -1024,6 +1104,199 @@ public class AmdsHelper {
         return result;
     }
 
+    private static String getPreprocessTableName(final int id) {
+        return QueryHelper.pullString(String.format("select name from amds.preprocess where id=%d", id));
+    }
+
+    private static JSONObject createSheetTable(final String name, final String columns) {
+        var cols = columns.split(",");
+        var query = "create table amds.%s (row_name varchar(1000),%s,user_id varchar(45))";
+        var builder = new StringBuilder();
+        var type = " varchar(100)";
+        var i = 0;
+        for (var col : cols) {
+            if (col.contains("comment")) {
+                type = " varchar(1000)";
+            } else if (col.contains("row_name")) {
+                type = " varchar(300)";
+            }
+            builder.append(col).append(type);
+            if (i < cols.length -1) {
+                builder.append(",");
+            }
+            i++;
+        }
+        return QueryHelper.execute(String.format(query, name, builder));
+
+    }
+
+    public static JSONObject setNewSheetModel(final int id) {
+        var selectQuery = String.format("select row_name,info_row from amds.preprocess where id=%d", id);
+        var query = "insert into amds.sheet_model values('%s',%d,%d,%d)";
+        var result = new JSONObject();
+        result.put(MESSAGE, "success");
+        var errors = new JSONArray();
+        var table = QueryHelper.pullTable(selectQuery).getJSONArray(MESSAGE);
+        for (var i = 0; i < table.length(); i++) {
+            var rowName = table.getJSONObject(i).getString("row_name").replace("'", "\\'");
+            var infoRow = Integer.parseInt(table.getJSONObject(i).getString("info_row"));
+            var status = QueryHelper.execute(String.format(query, rowName, i, infoRow, id));
+            if (!status.has(MESSAGE) || !status.getString(MESSAGE).equals("success")) {
+                errors.put(status);
+            }
+        }
+            if (!errors.isEmpty()) {
+                result = Helper.getFailedObject();
+                result.put("errors", errors);
+            }
+            return result;
+    }
+    public static JSONObject createNewTable(final JSONObject object, final int id) {
+        var name = getPreprocessTableName(id);
+        var result = new JSONObject();
+        var buttonQuery = String
+                .format("insert into amds.button_columns values(%d,'%s','%s')",
+                        id, object.getString("button-column"), name);
+
+        result.put("button-column", QueryHelper.execute(buttonQuery));
+        var sheetQuery = "insert into amds.sheets (id,name,properties," +
+                "user,mask_name,row_fields,ui_fields,user_ui_fields,head) values(%d,'%s','%s','%s','%s','%s','%s','%s','%s')";
+
+        var rowFields = object.getJSONObject("row-fields");
+        var header = AmdsHelper.getUpdatedHeader(id, object.getJSONArray("visible-columns"))
+                .replace("'", "\\'");
+        var userColumns = object.getString("user-columns").replaceAll(",$", "")
+                .replace("row_name,", "");
+        var userUiColumns = object.getString("user-ui-columns").replaceAll(",$", "")
+                .replace("row_name,", "");
+        var columns = object.getString("columns").replaceAll(",$", "")
+                .replace("row_name,", "");
+        var uiColumns = String
+                .join(",", JsonHelper.getListFromJsonArray(object.getJSONArray("visible-columns")))
+                .replace("row_name,", "");
+        var procSheetQuery = String
+                .format(sheetQuery, id, name, columns, userColumns, name, rowFields.toString(),
+                        uiColumns, userUiColumns, header);
+        result.put("sheets", QueryHelper.execute(procSheetQuery));
+        result.put("new-sheet", createSheetTable(normalizeTable(name), columns));
+        result.put("model", setNewSheetModel(id));
+        return result;
+    }
+
+
+    public static JSONObject deleteSheetTable(final int id) {
+        var name = QueryHelper.pullString(String.format("select name from amds.sheets where id=%d", id));
+        var result = new JSONObject();
+
+        result.put("delete-sheet-record",
+                QueryHelper.execute(String.format("delete from amds.sheets where id=%d", id)));
+
+        result.put("delete-model-record",
+                QueryHelper.execute(String.format("delete from amds.sheet_model where sheet_id=%d", id)));
+        result.put("delete-preprocess",
+                QueryHelper.execute(String.format("delete from amds.preprocess where id=%d", id)));
+        result.put("delete-header",
+                QueryHelper.execute(String.format("delete from amds.preprocess_headers where id=%d", id)));
+        result.put("delete-button", QueryHelper
+                .execute(String.format("delete from amds.button_columns where id=%d", id)));
+        if (Helper.isThing(name)) {
+            var normalized = normalizeTable(name);
+            result.put("delete-table", QueryHelper.execute(String.format("drop table amds.%s", normalized)));
+        } else {
+            return new JSONObject(String.format("status: failure, reason: table with id %d not found", id));
+        }
+        return result;
+    }
+
+
+    public static Element getUpperCell(final org.jsoup.select.Elements rows, final int cellInd) {
+        var upperRow = rows.get(0).getElementsByTag("th");
+        var lowerRow = rows.get(1).getElementsByTag("th");
+        var uppIndex = 0;
+        var lowIndex = 0;
+        for (var cell : upperRow) {
+            if (cell.hasAttr("colspan") && Integer.parseInt(cell.attr("colspan")) > 1) {
+                var colspan = Integer.parseInt(cell.attr("colspan"));
+                for (var i = 0; i < colspan; i++) {
+                    lowIndex++;
+                    if (lowIndex == cellInd) {
+                        return upperRow.get(uppIndex);
+                    }
+
+                }
+            }
+            uppIndex++;
+        }
+        return null;
+    }
+    public static String getUpdatedHeader(final int id, final JSONArray columnMappings) {
+        final var columns = JsonHelper.getListFromJsonArray(columnMappings);
+        var query = "select header from amds.preprocess_headers where id=%d";
+        var header = QueryHelper.pullString(String.format(query, id));
+        if (Helper.isThing(header)) {
+            var document = Jsoup.parse(header);
+            var rows = document.getElementsByTag("tr");
+            var actualRow = rows.get(rows.size() - 1);
+                var cells = actualRow.clone().getElementsByTag("th");
+            actualRow.empty();
+            var i = 0;
+            for (org.jsoup.nodes.Element cell : cells) {
+                var cellContent = cell.html().toLowerCase().replace(" ", "_");
+                if (columns.contains(cellContent) || cellContent.equals("row_name")) {
+                    if (cellContent.equals("row_name")) {
+                        cell.html("");
+                    }
+
+                    actualRow.append(cell.outerHtml());
+                } else {
+                    if (!columns.contains(cellContent)) {
+                        if (rows.size() > 1 && i>0) {
+                            var upperCell = getUpperCell(rows, i);
+                            var newColspan = Integer.parseInt(upperCell.attr("colspan")) -1;
+                            upperCell.attr("colspan", Integer.toString(newColspan));
+                        }
+                    }
+                }
+                i++;
+            }
+
+            var tbody = document.createElement("tbody");
+            document.getElementsByTag("table").get(0).append(tbody.outerHtml());
+            return document.getElementsByTag("table").get(0).outerHtml();
+        }
+        return null;
+    }
+    public static String createPreprocessQuery(final String tableName, final String columns, final JSONArray rows) {
+        var id = getNewSheetId();
+        var query = "insert into amds.preprocess (id,row_name,name,info_row,column_names) values %s";
+        var rowMask = "(%d,'%s','%s',%d,'%s')";
+        var builder = new StringBuilder();
+        for (var i = 0; i < rows.length(); i++) {
+            var rowObj = rows.getJSONObject(i);
+            var infoRow = (int) Double.parseDouble(rowObj.getString("info-row"));
+            var rowPart = String.format(rowMask, id, rowObj.getString("row-name"),
+                    tableName, infoRow, columns);
+            builder.append(rowPart);
+            if (i < rows.length() - 1) {
+                builder.append(",");
+            }
+        }
+        return String.format(query, builder.toString());
+    }
+
+    public static JSONObject createSheetQuery(final int id) {
+        final var name = getTableName(Integer.toString(id));
+        final var columns = getColumns(Integer.toString(id));
+        final var query = "create table amds."
+                + normalizeTable(name) + "(row_name varchar(300)," + enrichColumns(columns) + ")";
+//        var status = QueryHelper.getData(query, EXECUTE);
+//        if (status.getString(MESSAGE).contains("SQL syntax")) {
+//            System.out.println(name + "::::::::::" + status);
+//
+//        }
+//        return status;
+        return new JSONObject();
+    }
 
     public static void createSheetsTables() {
         final String namesQuery = "select name from amds.sheets";
@@ -1051,20 +1324,33 @@ public class AmdsHelper {
 
     }
 
+
+    private static String updateSectionName(final String section, final String name) {
+        var document = Jsoup.parse(section);
+        var element = document.body().child(0);
+        element.attr(ID, name);
+        return element.outerHtml();
+    }
+
     /*
     @method to create a new layput, template and section by copying them from the existing by id
      */
     public static int createNewSection(final int templateId, final String name) {
         final var newId = getNewSectionId() + 1;
         var layout = getLayout(templateId).getString(MESSAGE);
-        final var section = getTemplate(templateId).getJSONArray(MESSAGE).getJSONObject(0).getString(TEMPLATE);
+        final var section = getTemplate(templateId).getJSONArray(MESSAGE).getJSONObject(0)
+                .getString(TEMPLATE).replace('\'', '"');
+        final var updatedSection = updateSectionName(section, name);
+
         final var lQuery = String.format("insert into amds.layouts values(%d,'%s','%s')", newId, layout, name);
         final var seq = bumpFooterSequence();
-        final var sQuery = String.format("insert into amds.sections values(%d,%d,'%s','{}')", newId, seq, section);
-        final var tQuery = String.format("insert into amds.templates values(%d,%d,'%s','%s')", newId,newId,name,section);
-        QueryHelper.getData(lQuery,EXECUTE);
-        QueryHelper.getData(sQuery, EXECUTE);
-        QueryHelper.getData(tQuery, EXECUTE);
+        final var sQuery = String
+                .format("insert into amds.sections values(%d,%d,'%s','{}','%s')", newId, seq, updatedSection,name);
+        final var tQuery = String
+                .format("insert into amds.templates values(%d,%d,'%s','%s')", newId, newId, name, updatedSection);
+        var crLayoutStatus = QueryHelper.getData(lQuery,EXECUTE);
+        var crSectionStatus = QueryHelper.getData(sQuery, EXECUTE);
+        var crTemplateStatus = QueryHelper.getData(tQuery, EXECUTE);
         return newId;
     }
 

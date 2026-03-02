@@ -52,16 +52,49 @@ public class FileHelper {
         return result;
     }
 
-    public static boolean moveFile(final String pathFrom, final String pathTo) {
-        var result = false;
+
+    private static String copyName(final String path, final String prefix) {
+        final var parts = path.split("[/\\\\]");
+        var buff = new StringBuilder();
+        for(var i = 0; i < parts.length; i++) {
+            if (i < parts.length - 1) {
+                buff.append(parts[i]).append(File.separator);
+            } else {
+                buff.append(prefix).append("_").append(parts[i]);
+            }
+        }
+        return buff.toString();
+    }
+    private static String copyFile(final String pathFrom) {
+        var result = "false";
+        var pathTo = copyName(pathFrom, "copy");
+        var outPath = "";
         try {
             var fileFrom = new File(pathFrom);
             var fileTo = new File(pathTo);
             if(fileTo.exists()) {
                 fileTo.delete();
             }
+            FileUtils.copyFile(fileFrom, fileTo);
+            result = fileTo.getAbsolutePath();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return result;
+    }
+
+    public static String moveFile(final String pathFrom, final String pathTo) {
+        var result = "false";
+        var outPath = "";
+        try {
+            var copied = copyFile(pathTo);
+            var fileFrom = new File(pathFrom);
+            var fileTo = new File(pathTo);
+            if(fileTo.exists()) {
+                fileTo.delete();
+            }
             FileUtils.moveFile(fileFrom, fileTo);
-            result = true;
+            result = String.format("index copied to %s, and new html published to %s", copied, fileTo.getAbsolutePath());
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

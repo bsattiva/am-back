@@ -22,7 +22,8 @@ import java.util.stream.Stream;
 
 public class QueryHelper {
     private static final String SECRET = "82hj 36j !!!4 %$ suyseuweyb ^^8hscvb";
-    private static final String MAIL_SECRET = "qdb82qjd!^&shaagsa ashjjsag &^(";
+     private static final String MAIL_SECRET = "qdb82qjd!^&shaagsa ashjjsag &^(";
+    private static final String ID = "id";
     private static final String MESSAGE = "message";
     private static final String STATUS = "status";
     private static final String PULL_STRING = "pull-string";
@@ -40,6 +41,22 @@ public class QueryHelper {
     private static final int MAX_RECORDS = 20;
     private static final String MASK = "?";
 
+    public static JSONObject execute(final String query) {
+        return getData(query, EXECUTE);
+    }
+
+    public static JSONObject pullTable(final String query) {
+        return getData(query, PULL_TABLE);
+    }
+
+    public static JSONObject pullList(final String query) {
+        return getData(query, PULL_LIST);
+    }
+
+    public static String pullString(final String query) {
+        var result = getData(query, PULL_STRING);
+        return (result.has(MESSAGE)) ? result.getString(MESSAGE) : null;
+    }
     public static JSONObject getData(final String query, final String type){
         JSONObject object = new JSONObject("{}");
         object.put("query", query);
@@ -83,8 +100,18 @@ public class QueryHelper {
         return getData(query, EXECUTE);
     }
 
+    public static JSONObject deleteSection(final int id) {
+        var query = String.format("delete from amds.sections where id=%d and id > 11 and id != 13", id);
+        return getData(query, EXECUTE);
+    }
+
+    public static JSONObject deleteTemplate(final int id) {
+        var query = String.format("delete from amds.templates where id=%d and id > 11 and id != 13", id);
+        return getData(query, EXECUTE);
+    }
+
     public static int getRevisionNumber(final String table) {
-        final var query = String.format("select max(revision) from amds.%s", table);
+        final var query = String.format("select max(revision) from amds.back_%s", table);
         final var res = getData(query, PULL_STRING);
         if (res.has(MESSAGE) && Helper.isThing(res.getString(MESSAGE))) {
             return Integer.parseInt(res.getString(MESSAGE));
@@ -100,8 +127,11 @@ public class QueryHelper {
         var stat = "";
         for (var i = 0; i < entries.length(); i++) {
             final var row = entries.getJSONObject(i);
+            if (row.getString(ID).equals("14")) {
+                System.out.println(ID);
+            }
             var finalQuery = String.format(insertQuery,
-                    Integer.parseInt(row.getString("id")),
+                    Integer.parseInt(row.getString(ID)),
                     Integer.parseInt(row.getString("seq")),
                     row.getString("template"),
                     row.getString("data_object"),
@@ -127,8 +157,8 @@ public class QueryHelper {
         for (var i = 0; i < entries.length(); i++) {
             final var row = entries.getJSONObject(i);
             var finalQuery = String.format(insertQuery,
-                    Integer.parseInt(row.getString("id")),
-                    row.getString("template"),
+                    Integer.parseInt(row.getString(ID)),
+                    row.getString("template").replace('\'', '"'),
                     revision);
 
             final var result = getData(finalQuery, EXECUTE);
@@ -711,6 +741,7 @@ public class QueryHelper {
                 AmdsHelper.getTableName(sheet_name)
                 + " where user_id = u.section)";
         return getData(query, PULL_TABLE).getJSONArray(MESSAGE);
+
     }
 
     public static JSONArray getSheetNotUsers(final String sheet_name) {
@@ -761,6 +792,10 @@ public class QueryHelper {
     }
     private static Map<String, String> names = new HashMap<>();
 
+
+    public static JSONObject createSheet(final String query) {
+        return getData(query, EXECUTE);
+    }
     public static String getNameById(final String id){
         String result = "";
         if (!names.containsKey(id)) {
@@ -789,6 +824,19 @@ public class QueryHelper {
         data.put("subject",replace);
         String url = Helper.getUrl("mail.url");
         result = HttpClient.sendHttpsPost(data,url);
+        return result;
+    }
+
+    public static JSONObject sendRegisterMail(String email, String name, String password){
+        JSONObject result = Helper.getFailedObject();
+        JSONObject data = new JSONObject();
+
+        data.put("email",email);
+        data.put("name", name);
+        data.put("text", password);
+        var headers = new HashMap<String, String>(){{put("secret", MAIL_SECRET);}};
+        String url = Helper.getUrl("email.url") + "/register";
+        result = HttpClient.sendHttpsPost(data, url, headers);
         return result;
     }
 

@@ -28,6 +28,17 @@ public class JsonHelper {
     }
 
 
+    public static JSONArray getDistinctFromStringArray(final JSONArray array) {
+        var result = new JSONArray();
+        List<String> list = new ArrayList<>();
+        for (var i = 0; i < array.length(); i++) {
+            if (!list.contains(array.getString(i))) {
+                list.add(array.getString(i));
+                result.put(array.getString(i));
+            }
+        }
+        return result;
+    }
 
     public static List<String> getListFromJsonArray(final JSONArray array) {
         List<String> list = new ArrayList<>();
